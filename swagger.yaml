@@ -1,0 +1,353 @@
+openapi: 3.0.3
+info:
+  title: 百炼知识库 HTTP API
+  description: |
+    阿里云百炼（Bailian）知识库检索服务的 HTTP API 封装。
+    提供知识库列表查询和语义检索能力，可配合 AgentTeams「HTTP 转 MCP」功能将本服务自动包装为 MCP 工具。
+  version: 1.0.0
+  contact:
+    name: PDSA Team
+
+servers:
+  - url: http://localhost:3000
+    description: 本地开发
+  - url: http://bailian-kb-http.pdsa.svc.cluster.local:3000
+    description: ACS 集群内部
+
+tags:
+  - name: knowledge-base
+    description: 知识库操作
+  - name: health
+    description: 健康检查
+
+paths:
+  /healthz:
+    get:
+      tags:
+        - health
+      summary: 健康检查
+      operationId: healthCheck
+      responses:
+        "200":
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /list_knowledge_bases:
+    get:
+      tags:
+        - knowledge-base
+      summary: 列出知识库
+      description: 列出百炼工作空间下的所有知识库，返回知识库的 ID、名称、描述等信息。用于发现可用的知识库。
+      operationId: listKnowledgeBases
+      parameters:
+        - name: index_name
+          in: query
+          description: 按知识库名称筛选（支持模糊搜索）
+          required: false
+          schema:
+            type: string
+          example: AI网关
+        - name: page_number
+          in: query
+          description: 页码，从 1 开始，默认 1
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          description: 每页数量，默认 10
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        "200":
+          description: 成功返回知识库列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListIndicesResponse"
+              example:
+                RequestId: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+                Success: true
+                Status: 200
+                Data:
+                  PageNumber: 1
+                  PageSize: 10
+                  TotalCount: 2
+                  Indices:
+                    - Id: "idx-xxxxxxxxxxxx01"
+                      Name: "AI网关产品文档"
+                      Description: "AI 网关产品能力与最佳实践"
+                      StructureType: "UNSTRUCTURED"
+                      EmbeddingModelName: "text-embedding-v2"
+                      RerankModelName: "gte-rerank"
+                    - Id: "idx-xxxxxxxxxxxx02"
+                      Name: "SLS日志服务文档"
+                      Description: "日志服务产品文档"
+                      StructureType: "UNSTRUCTURED"
+                      EmbeddingModelName: "text-embedding-v2"
+                      RerankModelName: "gte-rerank"
+        "500":
+          description: 服务端错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /retrieve_knowledge:
+    post:
+      tags:
+        - knowledge-base
+      summary: 检索知识库
+      description: |
+        在指定的百炼知识库中检索信息。支持向量检索和关键词检索，可配置重排序。
+        返回匹配的文本切片及相似度分数。
+      operationId: retrieveKnowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetrieveRequest"
+            example:
+              index_id: "idx-xxxxxxxxxxxx01"
+              query: "AI网关支持哪些认证方式"
+              enable_reranking: true
+              rerank_top_n: 5
+      responses:
+        "200":
+          description: 成功返回检索结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetrieveResponse"
+              example:
+                RequestId: "B2C3D4E5-F6A7-8901-BCDE-F12345678901"
+                Success: true
+                Status: 200
+                Data:
+                  Nodes:
+                    - Score: 0.92
+                      Text: "AI 网关支持 API Key、OAuth 2.0、JWT 三种认证方式..."
+                      Metadata:
+                        source: "ai-gateway-auth.md"
+                        chunk_id: "c-001"
+                    - Score: 0.85
+                      Text: "认证配置步骤：1. 进入网关控制台..."
+                      Metadata:
+                        source: "ai-gateway-config.md"
+                        chunk_id: "c-042"
+        "400":
+          description: 缺少必填参数
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "index_id and query are required"
+        "500":
+          description: 服务端错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: bailian-knowledge-base-http
+
+    ListIndicesResponse:
+      type: object
+      properties:
+        RequestId:
+          type: string
+          description: 请求 ID
+        Code:
+          type: string
+          description: 错误码（成功时无此字段）
+        Message:
+          type: string
+          description: 错误信息（成功时无此字段）
+        Success:
+          type: boolean
+          description: 是否成功
+        Status:
+          type: integer
+          description: HTTP 状态码
+        Data:
+          type: object
+          properties:
+            PageNumber:
+              type: integer
+            PageSize:
+              type: integer
+            TotalCount:
+              type: integer
+              description: 知识库总数
+            Indices:
+              type: array
+              items:
+                $ref: "#/components/schemas/KnowledgeBaseIndex"
+
+    KnowledgeBaseIndex:
+      type: object
+      properties:
+        Id:
+          type: string
+          description: 知识库 ID
+        Name:
+          type: string
+          description: 知识库名称
+        Description:
+          type: string
+          description: 知识库描述
+        StructureType:
+          type: string
+          enum:
+            - UNSTRUCTURED
+            - STRUCTURED
+          description: 数据结构类型
+        ChunkSize:
+          type: integer
+          description: 切片大小
+        OverlapSize:
+          type: integer
+          description: 切片重叠大小
+        Separator:
+          type: string
+          description: 分隔符
+        EmbeddingModelName:
+          type: string
+          description: 向量化模型名称
+        RerankModelName:
+          type: string
+          description: 重排序模型名称
+        RerankMinScore:
+          type: string
+          description: 重排序最低分阈值
+        SourceType:
+          type: string
+          description: 数据源类型
+        SinkType:
+          type: string
+          description: 存储类型
+        SinkInstanceId:
+          type: string
+          description: 存储实例 ID
+        SinkRegion:
+          type: string
+          description: 存储地域
+
+    RetrieveRequest:
+      type: object
+      required:
+        - index_id
+        - query
+      properties:
+        index_id:
+          type: string
+          description: 知识库 ID，可通过 list_knowledge_bases 获取
+        query:
+          type: string
+          description: 检索查询文本
+        dense_similarity_top_k:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 100
+          description: 向量检索返回的最大结果数
+        sparse_similarity_top_k:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 100
+          description: 关键词检索返回的最大结果数
+        enable_reranking:
+          type: boolean
+          default: true
+          description: 是否开启重排序
+        rerank_min_score:
+          type: number
+          format: float
+          minimum: 0.01
+          maximum: 1.0
+          description: 重排序最低相似度阈值
+        rerank_top_n:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+          description: 重排序后返回的 Top N 条数
+        enable_rewrite:
+          type: boolean
+          default: false
+          description: 是否开启多轮对话改写
+
+    RetrieveResponse:
+      type: object
+      properties:
+        RequestId:
+          type: string
+          description: 请求 ID
+        Code:
+          type: string
+          description: 错误码（成功时无此字段）
+        Message:
+          type: string
+          description: 错误信息（成功时无此字段）
+        Success:
+          type: boolean
+          description: 是否成功
+        Status:
+          type: integer
+          description: HTTP 状态码
+        Data:
+          type: object
+          properties:
+            Nodes:
+              type: array
+              items:
+                $ref: "#/components/schemas/RetrieveNode"
+
+    RetrieveNode:
+      type: object
+      properties:
+        Score:
+          type: number
+          format: float
+          description: 相似度分数
+        Text:
+          type: string
+          description: 匹配的文本内容
+        Metadata:
+          type: object
+          additionalProperties: true
+          description: 文本片段的元信息（来源文件、chunk ID 等）
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: 错误信息
