@@ -1,0 +1,1 @@
+# Configuration module\nDATABASE_URL = 'sqlite:///app.db'\nDEBUG = True\nSECRET_KEY = 'dev-key-change-in-prod'\n
