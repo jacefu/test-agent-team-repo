@@ -6,7 +6,7 @@ on:
 
 permissions:
   pull-requests: write
-  contents: read
+  contents: write
 
 jobs:
   review:
@@ -32,10 +32,11 @@ jobs:
           - 作者: ${AUTHOR}
           - 分支: ${HEAD_REF} → ${BASE_REF}
 
-          请分析变更内容、评估风险等级，并给出审查意见。"
+          请分析变更内容、评估风险等级，并给出审查意见。
+          最后一行请明确输出：MERGE_DECISION: APPROVE 或 MERGE_DECISION: REQUEST_CHANGES"
 
-          # 调用 Agent API（SSE 流式），收集完整响应
-          RESPONSE=$(curl -sN -X POST http://aigw.agentscraft.com/githubtl/api/console/chat \
+          # 调用 Agent API（SSE 流式），保存原始响应到文件
+          curl -sN -X POST http://aigw.agentscraft.com/githubtl/api/console/chat \
             -H "Content-Type: application/json" \
             -H "Accept: text/event-stream" \
             -H "X-Agent-Id: default" \
@@ -50,24 +51,37 @@ jobs:
                 user_id: "default",
                 channel: "github-cli",
                 stream: true
-              }')")
+              }')" > /tmp/sse_response.txt
 
-          # 从 SSE 流中提取最终文本内容
-          # 1. 去掉 "data: " 前缀
-          # 2. 精确匹配顶层 object=content 且 status=completed 的行
-          # 3. 取最后一条（最终结果）
-          REVIEW=$(echo "$RESPONSE" \
-            | sed 's/^data: //' \
-            | grep -E '^\{.*"object":"content".*"status":"completed"' \
-            | tail -1 \
-            | jq -r '.text // empty')
-
-          if [ -z "$REVIEW" ]; then
-            REVIEW="⚠️ Agent 未返回有效审查结果，请手动检查。"
-          fi
-
-          # 将结果写入文件避免 shell 转义问题
-          echo "$REVIEW" > /tmp/review.md
+          # 用 Python 可靠地解析 SSE 响应
+          python3 -c "
+          import json, sys
+          review_text = ''
+          with open('/tmp/sse_response.txt', 'r') as f:
+              for line in f:
+                  line = line.strip()
+                  if not line.startswith('data: '):
+                      continue
+                  try:
+                      d = json.loads(line[6:])
+                      if d.get('object') == 'content' and d.get('status') == 'completed' and d.get('text'):
+                          review_text = d['text']
+                  except:
+                      pass
+          if not review_text:
+              review_text = '⚠️ Agent 未返回有效审查结果，请手动检查。'
+          with open('/tmp/review.md', 'w') as f:
+              f.write(review_text)
+          # 提取 merge decision
+          decision = 'UNKNOWN'
+          if 'MERGE_DECISION: APPROVE' in review_text:
+              decision = 'APPROVE'
+          elif 'MERGE_DECISION: REQUEST_CHANGES' in review_text:
+              decision = 'REQUEST_CHANGES'
+          with open('/tmp/merge_decision.txt', 'w') as f:
+              f.write(decision)
+          print(f'Review length: {len(review_text)}, Decision: {decision}')
+          "
 
       - name: Post Review Comment to PR
         uses: actions/github-script@v7
@@ -81,3 +95,16 @@ jobs:
               issue_number: context.issue.number,
               body: `🤖 **AI Code Review**\n\n${review}`
             });
+
+      - name: Auto Merge if Approved
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          DECISION=$(cat /tmp/merge_decision.txt)
+          echo "Merge decision: $DECISION"
+          if [ "$DECISION" = "APPROVE" ]; then
+            echo "Auto-merging PR #${PR_NUMBER}..."
+            gh pr merge ${PR_NUMBER} --merge --auto
+          else
+            echo "PR not approved for auto-merge. Decision: $DECISION"
+          fi
