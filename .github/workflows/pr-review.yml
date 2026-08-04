@@ -32,7 +32,7 @@ jobs:
           - 作者: ${AUTHOR}
           - 分支: ${HEAD_REF} → ${BASE_REF}
 
-          请分析变更内容、评估风险等级，并给出审查意见。你必须让你的团队成员执行任务，你只需要分析拆解任务和分配任务即可。
+          请分析变更内容、评估风险等级，并给出审查意见。你必须让你的团队成员执行任务，你只需要分析拆解任务和分配任务即可，任务评审人是你Team的Human管理员。
           最后一行请明确输出：MERGE_DECISION: APPROVE 或 MERGE_DECISION: REQUEST_CHANGES"
 
           # 调用 Agent API（SSE 流式），保存原始响应到文件
