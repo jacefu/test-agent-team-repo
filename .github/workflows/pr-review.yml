@@ -38,7 +38,7 @@ jobs:
             -H "x-api-key: ${AGENT_API_KEY}" \
             --max-time 120 \
             -d "$(jq -n \
-              --arg prompt "请审查以下 Pull Request：\n- 仓库: ${REPO}\n- PR #${PR_NUMBER}: ${PR_TITLE}\n- 链接: ${PR_URL}\n- 作者: ${AUTHOR}\n- 分支: ${HEAD_REF} → ${BASE_REF}\n\n请分析变更内容、评估风险等级，并给出审查意见。\n审查完成后，最后一行请明确输出：MERGE_DECISION: APPROVE 或 MERGE_DECISION: REQUEST_CHANGES" \
+              --arg prompt "请审查以下 Pull Request：\n- 仓库: ${REPO}\n- PR #${PR_NUMBER}: ${PR_TITLE}\n- 链接: ${PR_URL}\n- 作者: ${AUTHOR}\n- 分支: ${HEAD_REF} → ${BASE_REF}\n\n请分析变更内容、评估风险等级，并给出审查意见。无论任务简单与复杂，你都需要创建任务，你负责分析任务、拆解任务、将任务分配给你Team里的成员。任务评审人为你Team里的Human管理员。\n审查完成后，最后一行请明确输出：MERGE_DECISION: APPROVE 或 MERGE_DECISION: REQUEST_CHANGES" \
               --arg session "$SESSION_ID" \
               '{input: [{ role: "user", content: [{ type: "text", text: $prompt }] }], session_id: $session, user_id: "default", channel: "github-cli", stream: true}')" > /tmp/sse_response.txt
 
