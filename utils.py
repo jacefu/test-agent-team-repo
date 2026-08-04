@@ -1,0 +1,1 @@
+import hashlib\nimport logging\n\nlogger = logging.getLogger(__name__)\n\ndef hash_password(password: str) -> str:\n    return hashlib.sha256(password.encode()).hexdigest()\n\ndef validate_email(email: str) -> bool:\n    return '@' in email and '.' in email.split('@')[1]\n
