@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: 百炼知识库 HTTP API
+  title: 百炼知识库 HTTP API HTTP TO MCP
   description: |
     阿里云百炼（Bailian）知识库检索服务的 HTTP API 封装。
     提供知识库列表查询和语义检索能力，可配合 AgentTeams「HTTP 转 MCP」功能将本服务自动包装为 MCP 工具。
