@@ -150,12 +150,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
           DECISION=$(cat /tmp/merge_decision.txt)
           echo "Merge decision: $DECISION"
           if [ "$DECISION" = "APPROVE" ]; then
-            echo "Auto-merging PR #${PR_NUMBER}..."
-            gh pr merge ${PR_NUMBER} --merge --auto
+            echo "Auto-merging PR #${PR_NUMBER} via GitHub API..."
+            gh api --method PUT "/repos/${REPO}/pulls/${PR_NUMBER}/merge" \
+              -f merge_method=merge \
+              -f commit_title="Auto-merged by AI Review (#${PR_NUMBER})"
           else
             echo "PR not approved for auto-merge. Decision: $DECISION"
           fi
