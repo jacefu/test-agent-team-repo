@@ -23,6 +23,7 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
+          SESSION_ID: ${{ github.repository }}-pr-${{ github.event.pull_request.number }}
         run: |
           PROMPT="请审查以下 Pull Request：
           - 仓库: ${REPO}
@@ -42,9 +43,10 @@ jobs:
             --max-time 300 \
             -d "$(jq -n \
               --arg prompt "$PROMPT" \
+              --arg session "$SESSION_ID" \
               '{
                 input: [{ role: "user", content: [{ type: "text", text: $prompt }] }],
-                session_id: "",
+                session_id: $session,
                 user_id: "default",
                 channel: "github-cli",
                 stream: true
