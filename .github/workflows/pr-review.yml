@@ -36,7 +36,7 @@ jobs:
             -H "Accept: text/event-stream" \
             -H "X-Agent-Id: default" \
             -H "x-api-key: ${AGENT_API_KEY}" \
-            --max-time 180 \
+            --max-time 300 \
             -d "$(jq -n \
               --arg prompt "请审查以下 Pull Request：\n- 仓库: ${REPO}\n- PR #${PR_NUMBER}: ${PR_TITLE}\n- 链接: ${PR_URL}\n- 作者: ${AUTHOR}\n- 分支: ${HEAD_REF} → ${BASE_REF}\n\n重要：请先立即回复 REVIEW_IN_PROGRESS 表示已收到请求，然后再开始创建Task和分配Worker进行审查。\n审查全部完成后，请返回完整审查结果，并在最后一行明确输出：MERGE_DECISION: APPROVE 或 MERGE_DECISION: REQUEST_CHANGES" \
               --arg session "$SESSION_ID" \
@@ -74,7 +74,7 @@ jobs:
               -H "Accept: text/event-stream" \
               -H "X-Agent-Id: default" \
               -H "x-api-key: ${AGENT_API_KEY}" \
-              --max-time 180 \
+              --max-time 300 \
               -d "$(jq -n \
                 --arg session "$SESSION_ID" \
                 '{input: [{ role: "user", content: [{ type: "text", text: "你的PR审查完成了吗？如果已完成，请返回完整的审查结果，并在最后一行输出 MERGE_DECISION: APPROVE 或 MERGE_DECISION: REQUEST_CHANGES。如果还在进行中，请回复：REVIEW_IN_PROGRESS" }] }], session_id: $session, user_id: "default", channel: "github-cli", stream: true}')" > /tmp/sse_poll.txt || true
